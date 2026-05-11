@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Public and private user profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photoURL": { "type": "string" },
+        "onlineStatus": { "type": "string", "enum": ["online", "offline", "away"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastSeen": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Meeting": {
+      "title": "Meeting Content",
+      "description": "Metadata for a video meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostId": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "active", "ended"] },
+        "password": { "type": "string" },
+        "isLocked": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" },
+        "inviteCode": { "type": "string" }
+      },
+      "required": ["id", "hostId", "status"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "A message sent within a meeting chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "senderId", "meetingId", "text"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles"
+    },
+    "meetings/{meetingId}": {
+      "schema": "Meeting",
+      "description": "Stores meeting metadata"
+    },
+    "meetings/{meetingId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Subcollection for meeting messages"
+    },
+    "meetings/{meetingId}/participants/{userId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "joinedAt": { "type": "string", "format": "date-time" },
+          "isMuted": { "type": "boolean" },
+          "isVideoOff": { "type": "boolean" },
+          "displayName": { "type": "string" }
+        }
+      },
+      "description": "Tracks active participants in a meeting"
+    }
+  }
+}

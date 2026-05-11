@@ -1,0 +1,6 @@
+{
+  "name": "ConnectCall Pro",
+  "description": "Enterprise-grade AI-powered real-time communication platform for high-performance teams.",
+  "requestFramePermissions": ["camera", "microphone", "display-capture"],
+  "majorCapabilities": ["Real-time Video", "AI Meeting Summaries", "Cloud Sync"]
+}

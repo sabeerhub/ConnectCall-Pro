@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // AUTH HELPERS
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ENTITY VALIDATIONS
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid is string && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidMeeting(data) {
+      return data.keys().hasAll(['id', 'hostId', 'status']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.hostId is string &&
+             data.status in ['scheduled', 'active', 'ended'];
+    }
+
+    // COLLECTIONS
+    
+    // User Profiles
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create, update: if isOwner(userId) && isValidUser(incoming());
+    }
+
+    // Meetings
+    match /meetings/{meetingId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidMeeting(incoming());
+      allow update: if (
+        isSignedIn() && (
+          // Host can update anything valid
+          (existing().hostId == request.auth.uid && isValidMeeting(incoming())) ||
+          // Others can only join (if we have a join field, otherwise handled in subcollection)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+        )
+      );
+    }
+
+    // Meeting Subcollections
+    match /meetings/{meetingId}/messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && incoming().senderId == request.auth.uid && incoming().meetingId == meetingId;
+    }
+
+    match /meetings/{meetingId}/participants/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(userId);
+    }
+  }
+}
