@@ -21,8 +21,9 @@ export default function AuthModal({ onSuccess }: AuthModalProps) {
       setLoading(true);
       await signInWithGoogle();
       onSuccess();
-    } catch (error) {
-      toast.error('Failed to sign in with Google');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Failed to sign in with Google');
     } finally {
       setLoading(false);
     }
@@ -37,8 +38,9 @@ export default function AuthModal({ onSuccess }: AuthModalProps) {
       await sendMagicLink(email);
       setMagicLinkSent(true);
       toast.success('Magic link has been sent to your email');
-    } catch (error) {
-      toast.error('Failed to send magic link');
+    } catch (error: any) {
+      console.error('Magic link error:', error);
+      toast.error(error.message || 'Failed to send magic link');
     } finally {
       setLoading(false);
     }

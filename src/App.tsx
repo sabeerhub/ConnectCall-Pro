@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-route
 import { useAuthStore } from './store/useAuthStore';
 import LandingPage from './features/landing/LandingPage';
 import AuthModal from './features/auth/AuthModal';
+import VerifyEmail from './features/auth/VerifyEmail';
 import MeetingRoom from './features/meeting/MeetingRoom';
 import Dashboard from './features/dashboard/Dashboard';
 import { Toaster } from 'sonner';
@@ -39,6 +40,7 @@ function AppContent() {
            <AuthModal onSuccess={() => navigate('/dashboard')} />
         </div>
       } />
+      <Route path="/auth/verify" element={<VerifyEmail />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/meeting/:id" element={<MeetingRoom />} />
     </Routes>
