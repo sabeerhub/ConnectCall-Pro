@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Video, Calendar, Settings, Bell, Search, Plus, 
   ArrowUpRight, Clock, Shield, LogOut, ChevronRight,
-  TrendingUp, Activity, LayoutGrid, List, Zap, Lock, Menu, X
+  TrendingUp, Activity, LayoutGrid, List, Zap, Lock, Menu, X,
+  Github, Twitter, Linkedin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -124,7 +125,29 @@ export default function Dashboard() {
           <span className="text-xl font-bold tracking-tight">Connect<span className="text-primary">Call</span></span>
         </div>
         <Navigation />
-        <div className="mt-auto p-2">
+        <div className="mt-auto p-2 space-y-2">
+           <div className="px-4 py-3 mb-2 rounded-2xl bg-primary/5 border border-primary/10">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2 opacity-60">Architect</p>
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <Zap size={14} />
+                 </div>
+                 <div className="min-w-0">
+                    <p className="text-xs font-bold truncate">@sabeerhub</p>
+                    <div className="flex gap-2 mt-1">
+                       <a href="https://twitter.com/_msabeer_" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          <Twitter size={10} />
+                       </a>
+                       <a href="https://github.com/sabeerhub" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          <Github size={10} />
+                       </a>
+                       <a href="https://linkedin.com/in/masabeer" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          <Linkedin size={10} />
+                       </a>
+                    </div>
+                 </div>
+              </div>
+           </div>
            <Button 
               variant="ghost" 
               onClick={handleLogout}
@@ -165,7 +188,29 @@ export default function Dashboard() {
                 </Button>
               </div>
               <Navigation />
-              <div className="mt-auto pt-4">
+              <div className="mt-auto pt-4 space-y-4">
+                <div className="px-4 py-3 rounded-2xl bg-primary/5 border border-primary/10">
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2 opacity-60">Architect</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Zap size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate">@sabeerhub</p>
+                      <div className="flex gap-4 mt-1">
+                        <a href="https://twitter.com/_msabeer_" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          <Twitter size={14} />
+                        </a>
+                        <a href="https://github.com/sabeerhub" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          <Github size={14} />
+                        </a>
+                        <a href="https://linkedin.com/in/masabeer" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          <Linkedin size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <Button variant="ghost" onClick={handleLogout} className="w-full justify-start h-12 text-muted-foreground font-semibold">
                   <LogOut size={20} className="mr-3" /> Sign Out
                 </Button>

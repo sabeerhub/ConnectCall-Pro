@@ -254,11 +254,11 @@ export default function LandingPage({ onGetStarted }: { onGetStarted: () => void
             </div>
          </div>
          <div className="max-w-7xl mx-auto pt-20 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-muted-foreground font-medium uppercase tracking-[0.2em]">
-            <p>© 2024 CONNECT CALL SYSTEMS INC. ALL RIGHTS RESERVED.</p>
+            <p>© 2024 CONNECT CALL SYSTEMS INC. CRAFTED BY <a href="https://github.com/sabeerhub" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold">SABEER</a>.</p>
             <div className="flex gap-8">
-               <span className="hover:text-primary cursor-pointer transition-colors">Twitter</span>
-               <span className="hover:text-primary cursor-pointer transition-colors">Github</span>
-               <span className="hover:text-primary cursor-pointer transition-colors">LinkedIn</span>
+               <a href="https://twitter.com/_msabeer_" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
+               <a href="https://github.com/sabeerhub" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Github</a>
+               <a href="https://linkedin.com/in/masabeer" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">LinkedIn</a>
             </div>
          </div>
       </footer>
