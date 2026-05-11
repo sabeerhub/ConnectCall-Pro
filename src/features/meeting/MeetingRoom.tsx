@@ -205,7 +205,12 @@ const VideoTile = ({ participant, isSpeaker, isHost, onToggleMedia, onKick }: Vi
 };
 
 export default function MeetingRoom() {
-  const { id: roomId } = useParams();
+  const { id } = useParams();
+  const roomId = useMemo(() => {
+    if (!id) return '';
+    // Clean ID: take everything before first '?' or '/' if present
+    return id.split(/[?#]/)[0].trim();
+  }, [id]);
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);

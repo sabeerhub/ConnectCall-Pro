@@ -44,14 +44,18 @@ export function useWebRTC(roomId: string, userId: string, userName: string) {
         socketRef.current = io('/', { path: '/socket.io' });
         socketRef.current.emit('join-room', roomId, userId);
 
-        socketRef.current.on('user-connected', (remoteUserId: string) => {
-          const peer = createPeer(remoteUserId, userId, stream);
-          peersRef.current[remoteUserId] = peer;
+        socketRef.current.on('all-users', (users: string[]) => {
+          users.forEach(remoteUserId => {
+            const peer = createPeer(remoteUserId, userId, stream);
+            peersRef.current[remoteUserId] = peer;
+          });
         });
 
         socketRef.current.on('receiving-returned-signal', (payload: { signal: SignalData, id: string }) => {
           const peer = peersRef.current[payload.id];
-          peer?.signal(payload.signal);
+          if (peer) {
+            peer.signal(payload.signal);
+          }
         });
 
         socketRef.current.on('user-joined-signal', (payload: { signal: SignalData, callerId: string }) => {
@@ -62,7 +66,7 @@ export function useWebRTC(roomId: string, userId: string, userName: string) {
         socketRef.current.on('user-disconnected', (remoteUserId: string) => {
           const peer = peersRef.current[remoteUserId];
           if (peer) {
-            (peer as any).destroy();
+            peer.destroy();
             delete peersRef.current[remoteUserId];
           }
           setParticipants(prev => prev.filter(p => p.id !== remoteUserId));
@@ -113,11 +117,29 @@ export function useWebRTC(roomId: string, userId: string, userName: string) {
   }, [roomId, userId]);
 
   function createPeer(userToCall: string, callerId: string, stream: MediaStream) {
-    const peer = new Peer({ initiator: true, trickle: false, stream });
-    peer.on('signal', signal => socketRef.current?.emit('sending-signal', { userToCall, callerId, signal }));
+    const peer = new Peer({ 
+      initiator: true, 
+      trickle: false, 
+      stream,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+        ]
+      }
+    });
+
+    peer.on('signal', signal => {
+      socketRef.current?.emit('sending-signal', { userToCall, callerId, signal });
+    });
+
     peer.on('stream', remoteStream => {
       setParticipants(prev => {
-        if (prev.find(p => p.id === userToCall)) return prev;
+        const existing = prev.find(p => p.id === userToCall);
+        if (existing) {
+          return prev.map(p => p.id === userToCall ? { ...p, stream: remoteStream } : p);
+        }
         return [...prev, { 
           id: userToCall, 
           stream: remoteStream, 
@@ -129,15 +151,35 @@ export function useWebRTC(roomId: string, userId: string, userName: string) {
         }];
       });
     });
+
+    peer.on('error', err => console.error('Peer error:', err));
     return peer;
   }
 
   function addPeer(incomingSignal: SignalData, callerId: string, stream: MediaStream) {
-    const peer = new Peer({ initiator: false, trickle: false, stream });
-    peer.on('signal', signal => socketRef.current?.emit('returning-signal', { signal, callerId }));
+    const peer = new Peer({ 
+      initiator: false, 
+      trickle: false, 
+      stream,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+        ]
+      }
+    });
+
+    peer.on('signal', signal => {
+      socketRef.current?.emit('returning-signal', { signal, callerId });
+    });
+
     peer.on('stream', remoteStream => {
-       setParticipants(prev => {
-        if (prev.find(p => p.id === callerId)) return prev;
+      setParticipants(prev => {
+        const existing = prev.find(p => p.id === callerId);
+        if (existing) {
+          return prev.map(p => p.id === callerId ? { ...p, stream: remoteStream } : p);
+        }
         return [...prev, { 
           id: callerId, 
           stream: remoteStream, 
@@ -149,11 +191,33 @@ export function useWebRTC(roomId: string, userId: string, userName: string) {
         }];
       });
     });
+
+    peer.on('error', err => console.error('Peer error:', err));
     peer.signal(incomingSignal);
     return peer;
   }
 
   const toggleMedia = (type: 'audio' | 'video', value: boolean, targetUserId: string) => {
+    // If it's for us, apply locally immediately for better UX
+    if (targetUserId === userId && localStreamRef.current) {
+      if (type === 'audio') {
+        localStreamRef.current.getAudioTracks().forEach(t => t.enabled = value);
+      } else {
+        localStreamRef.current.getVideoTracks().forEach(t => t.enabled = value);
+      }
+      
+      setParticipants(prev => prev.map(p => {
+        if (p.id === userId) {
+          return { 
+            ...p, 
+            isMuted: type === 'audio' ? !value : p.isMuted,
+            isVideoOff: type === 'video' ? !value : p.isVideoOff
+          };
+        }
+        return p;
+      }));
+    }
+    
     socketRef.current?.emit('toggle-media', { type, value, targetUserId, roomId });
   };
 
