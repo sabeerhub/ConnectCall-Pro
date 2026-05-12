@@ -12,10 +12,18 @@ export interface Participant {
   isMuted: boolean;
   isVideoOff: boolean;
   isSpeaking?: boolean;
+  connectionStatus?: 'connecting' | 'connected' | 'failed' | 'disconnected';
 }
 
 export function useWebRTC(roomId: string, userId: string, userName: string, userPhoto?: string) {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const participantsRef = useRef<Participant[]>([]);
+  
+  // Sync Ref with State for use in socket listeners
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+
   const socketRef = useRef<Socket | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<{ [key: string]: Instance }>({});
@@ -63,26 +71,35 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
   const createPeer = useCallback((userToCall: string, callerId: string, stream: MediaStream, remoteName: string, remotePhoto?: string) => {
     const peer = new Peer({ 
       initiator: true, 
-      trickle: false, 
+      trickle: true, 
       stream,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
         ]
       }
     });
 
     peer.on('signal', signal => {
+      console.log(`[Peer ${userToCall}] Generated signal:`, signal.type || 'candidate');
       socketRef.current?.emit('sending-signal', { userToCall, callerId, signal });
     });
 
+    peer.on('connect', () => {
+      console.log(`[Peer ${userToCall}] Connection established!`);
+      setParticipants(prev => prev.map(p => p.id === userToCall ? { ...p, connectionStatus: 'connected' } : p));
+    });
+
     peer.on('stream', remoteStream => {
+      console.log(`[Peer ${userToCall}] Received remote stream`, remoteStream.id);
       setParticipants(prev => {
         const existing = prev.find(p => p.id === userToCall);
         if (existing) {
-          return prev.map(p => p.id === userToCall ? { ...p, stream: remoteStream, peer } : p);
+          return prev.map(p => p.id === userToCall ? { ...p, stream: remoteStream, peer, connectionStatus: 'connected' } : p);
         }
         return [...prev, { 
           id: userToCall, 
@@ -92,38 +109,65 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
           name: remoteName, 
           photo: remotePhoto,
           isMuted: false, 
-          isVideoOff: false 
+          isVideoOff: false,
+          connectionStatus: 'connected'
         }];
       });
     });
 
-    peer.on('error', err => console.error('Peer error:', err));
+    peer.on('error', err => {
+      console.error(`[Peer ${userToCall}] Error:`, err);
+      setParticipants(prev => prev.map(p => p.id === userToCall ? { ...p, connectionStatus: 'failed' } : p));
+      
+      // Cleanup on error
+      if (peersRef.current[userToCall]) {
+        peersRef.current[userToCall].destroy();
+        delete peersRef.current[userToCall];
+      }
+    });
+
+    peer.on('close', () => {
+      console.log(`[Peer ${userToCall}] Connection closed`);
+      setParticipants(prev => prev.map(p => p.id === userToCall ? { ...p, connectionStatus: 'disconnected' } : p));
+    });
+
     return peer;
   }, [roomId]);
 
   const addPeer = useCallback((incomingSignal: SignalData, callerId: string, stream: MediaStream, remoteName: string, remotePhoto?: string) => {
+    console.log(`[Signaling] Initializing addPeer for ${callerId}`);
     const peer = new Peer({ 
       initiator: false, 
-      trickle: false, 
+      trickle: true, 
       stream,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-        ]
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+        ],
+        iceCandidatePoolSize: 10
       }
     });
 
     peer.on('signal', signal => {
+      console.log(`[Peer ${callerId}] Generated response signal:`, signal.type || 'candidate');
       socketRef.current?.emit('returning-signal', { signal, callerId });
     });
 
+    peer.on('connect', () => {
+      console.log(`[Peer ${callerId}] Connection (receiver) established!`);
+      setParticipants(prev => prev.map(p => p.id === callerId ? { ...p, connectionStatus: 'connected' } : p));
+    });
+
     peer.on('stream', remoteStream => {
+      console.log(`[Peer ${callerId}] Received remote stream (receiver)`, remoteStream.id);
       setParticipants(prev => {
         const existing = prev.find(p => p.id === callerId);
         if (existing) {
-          return prev.map(p => p.id === callerId ? { ...p, stream: remoteStream, peer } : p);
+          return prev.map(p => p.id === callerId ? { ...p, stream: remoteStream, peer, connectionStatus: 'connected' } : p);
         }
         return [...prev, { 
           id: callerId, 
@@ -133,12 +177,27 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
           name: remoteName, 
           photo: remotePhoto,
           isMuted: false, 
-          isVideoOff: false 
+          isVideoOff: false,
+          connectionStatus: 'connected'
         }];
       });
     });
 
-    peer.on('error', err => console.error('Peer error:', err));
+    peer.on('error', err => {
+      console.error(`[Peer ${callerId}] Error (receiver):`, err);
+      setParticipants(prev => prev.map(p => p.id === callerId ? { ...p, connectionStatus: 'failed' } : p));
+      
+      if (peersRef.current[callerId]) {
+        peersRef.current[callerId].destroy();
+        delete peersRef.current[callerId];
+      }
+    });
+
+    peer.on('close', () => {
+      console.log(`[Peer ${callerId}] Connection closed (receiver)`);
+      setParticipants(prev => prev.map(p => p.id === callerId ? { ...p, connectionStatus: 'disconnected' } : p));
+    });
+
     peer.signal(incomingSignal);
     return peer;
   }, [roomId]);
@@ -166,16 +225,39 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
         }]);
 
         socketRef.current = io('/', { path: '/socket.io' });
-        socketRef.current.emit('join-room', roomId, userId, userName, userPhoto);
 
         socketRef.current.on('all-users', (users: { userId: string, name: string, photo?: string }[]) => {
+          console.log(`[Socket] Received all-users: ${users.length} participants found.`);
+          
+          // Immediately add existing users to state so the joiner isn't "alone"
+          setParticipants(prev => {
+            const newParticipants = [...prev];
+            users.forEach(u => {
+              if (!newParticipants.find(p => p.id === u.userId)) {
+                newParticipants.push({
+                  id: u.userId,
+                  name: u.name,
+                  photo: u.photo,
+                  isLocal: false,
+                  isMuted: false,
+                  isVideoOff: false,
+                  stream: new MediaStream(),
+                  peer: null
+                });
+              }
+            });
+            return newParticipants;
+          });
+
           users.forEach(u => {
+            console.log(`[Signaling] Creating peer for existing user: ${u.userId}`);
             const peer = createPeer(u.userId, userId, stream, u.name, u.photo);
             peersRef.current[u.userId] = peer;
           });
         });
 
         socketRef.current.on('user-joined-notification', ({ userId: remoteId, name, photo }: any) => {
+          console.log(`[Socket] New user joined notification: ${name} (${remoteId})`);
           // New user joined, we'll wait for their signal (they are the initiator)
           setParticipants(prev => {
             if (prev.find(p => p.id === remoteId)) return prev;
@@ -186,25 +268,43 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
               isLocal: false, 
               isMuted: false, 
               isVideoOff: false, 
-              stream: new MediaStream(), // Placeholder until stream event
+              stream: new MediaStream(), 
               peer: null 
             }];
           });
         });
 
+        socketRef.current.emit('join-room', roomId, userId, userName, userPhoto);
+
         socketRef.current.on('user-joined-signal', (payload: { signal: SignalData, callerId: string }) => {
-          setParticipants(prev => {
-            const p = prev.find(x => x.id === payload.callerId);
-            const peer = addPeer(payload.signal, payload.callerId, stream, p?.name || 'Participant', p?.photo);
+          // Find if we already have this peer
+          let peer = peersRef.current[payload.callerId];
+          
+          if (peer) {
+            // If peer exists, just feed it the new signal (likely an ICE candidate)
+            console.log(`Feeding additional signal to existing peer: ${payload.callerId}`);
+            peer.signal(payload.signal);
+          } else {
+            // First signal from this user, create the peer
+            console.log(`First signal from ${payload.callerId}, creating peer...`);
+            
+            // Find metadata from participants list (added by notification)
+            const p = participantsRef.current.find(x => x.id === payload.callerId);
+            const remoteName = p?.name || 'Participant';
+            const remotePhoto = p?.photo;
+            
+            peer = addPeer(payload.signal, payload.callerId, stream, remoteName, remotePhoto);
             peersRef.current[payload.callerId] = peer;
-            return prev;
-          });
+          }
         });
 
         socketRef.current.on('receiving-returned-signal', (payload: { signal: SignalData, id: string }) => {
           const peer = peersRef.current[payload.id];
           if (peer) {
+            console.log(`Received returning signal for ${payload.id}`);
             peer.signal(payload.signal);
+          } else {
+            console.warn(`Received returning signal for unknown peer: ${payload.id}`);
           }
         });
 

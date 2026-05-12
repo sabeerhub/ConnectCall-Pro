@@ -116,10 +116,13 @@ const VideoTile = ({ participant, isSpeaker, isHost, onToggleMedia, onKick }: Vi
                <div className="flex items-center gap-3 bg-black/60 backdrop-blur-2xl px-4 py-2 rounded-2xl border border-white/5 shadow-2xl">
                  <div className={cn(
                    "w-2 h-2 rounded-full",
-                   isSpeaker ? "bg-primary animate-ping" : "bg-green-500"
+                   isSpeaker ? "bg-primary animate-ping" : (participant.connectionStatus === 'connected' || participant.isLocal ? "bg-green-500" : "bg-yellow-500 animate-pulse")
                  )} />
                  <span className="text-xs font-bold text-white tracking-widest uppercase">
                    {participant.isLocal ? "You" : participant.name}
+                   {participant.connectionStatus && participant.connectionStatus !== 'connected' && !participant.isLocal && (
+                     <span className="ml-2 text-[8px] text-white/40">[{participant.connectionStatus}]</span>
+                   )}
                  </span>
                  {participant.isMuted && <MicOff size={12} className="text-red-500/80" />}
                </div>
