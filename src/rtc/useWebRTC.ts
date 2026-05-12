@@ -71,7 +71,7 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
   const createPeer = useCallback((userToCall: string, callerId: string, stream: MediaStream, remoteName: string, remotePhoto?: string) => {
     const peer = new Peer({ 
       initiator: true, 
-      trickle: true, 
+      trickle: false, 
       stream,
       config: {
         iceServers: [
@@ -80,12 +80,14 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
           { urls: 'stun:stun2.l.google.com:19302' },
           { urls: 'stun:stun3.l.google.com:19302' },
           { urls: 'stun:stun4.l.google.com:19302' },
-        ]
+          { urls: 'stun:stun.services.mozilla.com' },
+        ],
+        iceCandidatePoolSize: 10
       }
     });
 
     peer.on('signal', signal => {
-      console.log(`[Peer ${userToCall}] Generated signal:`, signal.type || 'candidate');
+      console.log(`[Peer ${userToCall}] Generated offer signal:`, signal.type);
       socketRef.current?.emit('sending-signal', { userToCall, callerId, signal });
     });
 
@@ -138,7 +140,7 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
     console.log(`[Signaling] Initializing addPeer for ${callerId}`);
     const peer = new Peer({ 
       initiator: false, 
-      trickle: true, 
+      trickle: false, 
       stream,
       config: {
         iceServers: [
@@ -147,13 +149,14 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
           { urls: 'stun:stun2.l.google.com:19302' },
           { urls: 'stun:stun3.l.google.com:19302' },
           { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:stun.services.mozilla.com' },
         ],
         iceCandidatePoolSize: 10
       }
     });
 
     peer.on('signal', signal => {
-      console.log(`[Peer ${callerId}] Generated response signal:`, signal.type || 'candidate');
+      console.log(`[Peer ${callerId}] Generated answer signal:`, signal.type);
       socketRef.current?.emit('returning-signal', { signal, callerId });
     });
 
@@ -258,9 +261,10 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
 
         socketRef.current.on('user-joined-notification', ({ userId: remoteId, name, photo }: any) => {
           console.log(`[Socket] New user joined notification: ${name} (${remoteId})`);
-          // New user joined, we'll wait for their signal (they are the initiator)
+          
           setParticipants(prev => {
             if (prev.find(p => p.id === remoteId)) return prev;
+            console.log(`[UI] Adding placeholder for joining user: ${remoteId}`);
             return [...prev, { 
               id: remoteId, 
               name, 
@@ -269,7 +273,8 @@ export function useWebRTC(roomId: string, userId: string, userName: string, user
               isMuted: false, 
               isVideoOff: false, 
               stream: new MediaStream(), 
-              peer: null 
+              peer: null,
+              connectionStatus: 'connecting'
             }];
           });
         });

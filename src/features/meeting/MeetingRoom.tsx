@@ -232,10 +232,14 @@ export default function MeetingRoom() {
   const [activeTab, setActiveTab] = useState<'chat' | 'participants' | 'ai'>('chat');
   const [layoutMode, setLayoutMode] = useState<'grid' | 'focus' | 'theater'>('grid');
   const [meetingTime, setMeetingTime] = useState(0);
+  
+  // Ensure unique ID for guests to prevent signaling collisions in the same room
+  const guestId = useMemo(() => `guest_${Math.random().toString(36).substr(2, 9)}`, []);
+  const userId = user?.uid || guestId;
 
   const { participants, toggleMedia, activeSpeakerId, kickUser } = useWebRTC(
     (isAuthorized && roomId) ? roomId : '', 
-    user?.uid || 'GUEST', 
+    userId, 
     user?.displayName || 'Guest User',
     user?.photoURL || undefined
   );
@@ -333,15 +337,29 @@ export default function MeetingRoom() {
     }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const url = window.location.href;
+    
+    // Always attempt to copy to clipboard first as a reliable fallback
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (err) {
+      console.warn('Clipboard copy failed:', err);
+    }
+
     if (navigator.share) {
-      navigator.share({
-        title: 'Join my ConnectCall meeting',
-        url: url
-      }).catch(console.error);
+      try {
+        await navigator.share({
+          title: 'Join my ConnectCall meeting',
+          url: url
+        });
+      } catch (error: any) {
+        // If it's not a user cancellation, show a success toast for the clipboard copy instead
+        if (error.name !== 'AbortError') {
+          toast.success('Meeting link copied to clipboard');
+        }
+      }
     } else {
-      navigator.clipboard.writeText(url);
       toast.success('Meeting link copied to clipboard');
     }
   };

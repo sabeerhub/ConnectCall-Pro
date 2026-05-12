@@ -46,22 +46,28 @@ async function startServer() {
       socket.emit("all-users", currentUsersInRoom);
 
       socket.on("sending-signal", (payload: { userToCall: string, callerId: string, signal: any }) => {
+        console.log(`[Signaling] Offer from ${payload.callerId} to ${payload.userToCall} (type: ${payload.signal.type})`);
         const target = roomUsers.get(roomId)?.get(payload.userToCall);
         if (target) {
           io.to(target.socketId).emit("user-joined-signal", { 
             signal: payload.signal, 
             callerId: payload.callerId 
           });
+        } else {
+          console.warn(`[Signaling] Target ${payload.userToCall} not found in room ${roomId}`);
         }
       });
 
       socket.on("returning-signal", (payload: { signal: any, callerId: string }) => {
+        console.log(`[Signaling] Answer from ${userId} to ${payload.callerId} (type: ${payload.signal.type})`);
         const target = roomUsers.get(roomId)?.get(payload.callerId);
         if (target) {
           io.to(target.socketId).emit("receiving-returned-signal", { 
             signal: payload.signal, 
             id: userId 
           });
+        } else {
+          console.warn(`[Signaling] Caller ${payload.callerId} not found in room ${roomId}`);
         }
       });
 
