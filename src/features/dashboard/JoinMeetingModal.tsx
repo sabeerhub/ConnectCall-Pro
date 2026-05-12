@@ -48,10 +48,27 @@ export default function JoinMeetingModal({ isOpen, onClose }: JoinMeetingModalPr
   };
 
   const extractMeetingId = (input: string) => {
-    // Regex for UUID or meeting ID from link
-    const guidRegex = /[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}/i;
-    const match = input.match(guidRegex);
-    return match ? match[0] : input.trim();
+    const trimmed = input.trim();
+    if (!trimmed) return "";
+
+    // 1. Check if it's a full URL
+    try {
+      const url = new URL(trimmed);
+      const pathParts = url.pathname.split('/');
+      // The meeting ID should be the last part of the path in /meeting/:id
+      const idPart = pathParts[pathParts.length - 1];
+      if (idPart) return idPart;
+    } catch (e) {
+      // Not a valid URL, continue to other checks
+    }
+
+    // 2. Fallback to extracting the ID part directly if it's mixed with other text
+    // Our IDs are 8-char capital alphanumeric strings: ABCDEFGH
+    // Or it could be a UUID if we change formats later
+    const idRegex = /[A-Z0-9]{8}|[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}/i;
+    const match = trimmed.match(idRegex);
+    
+    return match ? match[0] : trimmed;
   };
 
   const validateMeeting = async () => {

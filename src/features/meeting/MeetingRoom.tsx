@@ -68,7 +68,8 @@ const VideoTile = ({ participant, isSpeaker, isHost, onToggleMedia, onKick }: Vi
       {participant.isVideoOff ? (
         <div className="w-full h-full bg-[#111] flex items-center justify-center relative overflow-hidden">
            <div className="absolute inset-0 bg-primary/5 animate-pulse" />
-           <Avatar className="w-20 h-20 md:w-32 md:h-32 border-[6px] border-[#0a0502] shadow-2xl relative z-10">
+           <Avatar className="w-20 h-20 md:w-32 md:h-32 border-[6px] border-[#0a0502] shadow-2xl relative z-10 transition-transform duration-500 group-hover:scale-110">
+              <AvatarImage src={participant.photo} className="object-cover" />
               <AvatarFallback className="text-3xl md:text-5xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-bold">
                  {participant.name[0]}
               </AvatarFallback>
@@ -232,7 +233,8 @@ export default function MeetingRoom() {
   const { participants, toggleMedia, activeSpeakerId, kickUser } = useWebRTC(
     (isAuthorized && roomId) ? roomId : '', 
     user?.uid || 'GUEST', 
-    user?.displayName || 'Guest User'
+    user?.displayName || 'Guest User',
+    user?.photoURL || undefined
   );
 
   const localParticipant = useMemo(() => participants.find(p => p.isLocal), [participants]);
@@ -518,7 +520,7 @@ export default function MeetingRoom() {
                     <VideoTile 
                       key={p.id} 
                       participant={p} 
-                      isSpeaker={p.id === activeSpeakerId || (p.isLocal && !isMuted)}
+                      isSpeaker={p.id === activeSpeakerId}
                       isHost={meetingData?.hostId === user?.uid}
                       onToggleMedia={toggleMedia}
                       onKick={kickUser}

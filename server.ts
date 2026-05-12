@@ -20,30 +20,35 @@ async function startServer() {
 
   const PORT = 3000;
 
-  // Room state to map user IDs to socket IDs
-  const roomUsers = new Map<string, Map<string, string>>(); // roomId -> (userId -> socketId)
+  // Room state to map user IDs to metadata
+  const roomUsers = new Map<string, Map<string, { socketId: string, name: string, photo?: string }>>(); 
 
   // Signalling logic for Mesh WebRTC (Simple-Peer)
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
-
-    socket.on("join-room", (roomId: string, userId: string) => {
-      console.log(`User ${userId} (Socket: ${socket.id}) joining room ${roomId}`);
+    socket.on("join-room", (roomId: string, userId: string, name: string, photo?: string) => {
+      console.log(`User ${name} (${userId}) joining room ${roomId}`);
       socket.join(roomId);
       
       if (!roomUsers.has(roomId)) {
         roomUsers.set(roomId, new Map());
       }
-      roomUsers.get(roomId)?.set(userId, socket.id);
+      roomUsers.get(roomId)?.set(userId, { socketId: socket.id, name, photo });
 
-      // Tell the new user who else is in the room
-      const otherUsers = Array.from(roomUsers.get(roomId)?.keys() || []).filter(id => id !== userId);
-      socket.emit("all-users", otherUsers);
+      // Tell existing users in the room that a new user joined
+      // (This is useful for reactive UI even before WebRTC connects)
+      socket.to(roomId).emit("user-joined-notification", { userId, name, photo });
+
+      // Tell the new user who else is currently in the room
+      const currentUsersInRoom = Array.from(roomUsers.get(roomId)!.entries())
+        .filter(([id]) => id !== userId)
+        .map(([id, data]) => ({ userId: id, name: data.name, photo: data.photo }));
+      
+      socket.emit("all-users", currentUsersInRoom);
 
       socket.on("sending-signal", (payload: { userToCall: string, callerId: string, signal: any }) => {
-        const targetSocketId = roomUsers.get(roomId)?.get(payload.userToCall);
-        if (targetSocketId) {
-          io.to(targetSocketId).emit("user-joined-signal", { 
+        const target = roomUsers.get(roomId)?.get(payload.userToCall);
+        if (target) {
+          io.to(target.socketId).emit("user-joined-signal", { 
             signal: payload.signal, 
             callerId: payload.callerId 
           });
@@ -51,26 +56,33 @@ async function startServer() {
       });
 
       socket.on("returning-signal", (payload: { signal: any, callerId: string }) => {
-        const targetSocketId = roomUsers.get(roomId)?.get(payload.callerId);
-        if (targetSocketId) {
-          io.to(targetSocketId).emit("receiving-returned-signal", { 
+        const target = roomUsers.get(roomId)?.get(payload.callerId);
+        if (target) {
+          io.to(target.socketId).emit("receiving-returned-signal", { 
             signal: payload.signal, 
-            id: userId // Use the sender's userId
+            id: userId 
           });
         }
       });
 
       socket.on("toggle-media", (payload: { type: 'audio' | 'video', value: boolean, targetUserId: string, roomId: string }) => {
-        io.to(payload.roomId).emit("toggle-remote-media", payload);
+        socket.to(payload.roomId).emit("toggle-remote-media", payload);
       });
 
       socket.on("kick-user", (payload: { targetUserId: string, roomId: string }) => {
         io.to(payload.roomId).emit("user-kicked", payload);
       });
+      
+      socket.on("speaking", (payload: { userId: string, roomId: string, isSpeaking: boolean }) => {
+        socket.to(payload.roomId).emit("user-speaking", payload);
+      });
 
       socket.on("disconnect", () => {
         console.log(`User ${userId} disconnected`);
         roomUsers.get(roomId)?.delete(userId);
+        if (roomUsers.get(roomId)?.size === 0) {
+          roomUsers.delete(roomId);
+        }
         socket.to(roomId).emit("user-disconnected", userId);
       });
     });
